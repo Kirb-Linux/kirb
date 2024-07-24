@@ -1,0 +1,7 @@
+Welcome to Kirb's test environment
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+Run `kirb` to get started. ;)
+
+Exit after you're done with testing
