@@ -16,7 +16,7 @@ func Prerun() {
 		fmt.Println("Oops, something went wrong!", err)
 		os.Exit(1)
 	}
-	_, err = os.Stat(homedir + "/.config/kirb/config.json")
+	_, err = os.Stat(homedir + "/.	config/kirb/config.json")
 
 	if err != nil {
 		if os.IsNotExist(err) {

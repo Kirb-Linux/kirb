@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/codeclysm/extract/v3"
 	"github.com/fatih/color"
+	"github.com/kirb-linux/kirb/helpers"
 	"io"
 	"log"
 	"net/http"
@@ -20,6 +21,7 @@ type Package struct {
 	Cloneurl      string
 	Workdir       string
 	Installscript string
+	Sha256        string
 }
 
 func DownloadFile(filepath string, url string) error {
@@ -71,7 +73,8 @@ func prep() Package {
 		"cloneurl": "https://github.com/dylanaraps/neofetch/archive/refs/tags/7.1.0.tar.gz",
 		"installscript": "make install",
 		"filename": "7.1.0.tar.gz",
-		"workdir": "neofetch-7.1.0"
+		"workdir": "neofetch-7.1.0",
+		"sha256": "58a95e6b714e41efc804eca389a223309169b2def35e57fa934482a6b47c27e7"
 	}`)
 
 	err := json.Unmarshal(Data, &target)
@@ -102,6 +105,16 @@ func Install() {
 	}
 
 	file, err := os.Open(filepath.Join("/tmp", pkgInfo.Filename))
+
+	hash := helpers.Sha256(file)
+
+	if hash != pkgInfo.Sha256 {
+
+		color.Red("Hash is mismatch (expected %s, got %s)", pkgInfo.Sha256, hash)
+		os.Exit(1)
+	}
+
+	file, err = os.Open(filepath.Join("/tmp", pkgInfo.Filename))
 
 	color.Green("Unarchiving files..")
 
