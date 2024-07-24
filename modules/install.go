@@ -1,12 +1,16 @@
 package modules
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/codeclysm/extract/v3"
 	"github.com/fatih/color"
+	"github.com/kirb-linux/kirb/globals"
 	"github.com/kirb-linux/kirb/helpers"
+	"github.com/kirb-linux/kirb/helpers/query"
 	"io"
 	"log"
 	"net/http"
@@ -21,7 +25,7 @@ type Package struct {
 	Cloneurl      string
 	Workdir       string
 	Installscript string
-	Sha256        string
+	Checksum      string
 }
 
 func DownloadFile(filepath string, url string) error {
@@ -57,25 +61,16 @@ func download(url string, name string) error {
 // Install the target package
 func prep() Package {
 
-	fmt.Println(len(os.Args))
-
-	if len(os.Args) < 3 {
+	if len(flag.Args()) < 2 {
 		fmt.Println("Usage: install <package>")
 		os.Exit(0)
 	}
 
-	fmt.Println("Looking for: ", os.Args[2])
+	fmt.Println("Looking for:", flag.Args()[1])
 
 	var target Package
 
-	Data := []byte(`{
-		"name": "neofetch",
-		"cloneurl": "https://github.com/dylanaraps/neofetch/archive/refs/tags/7.1.0.tar.gz",
-		"installscript": "make install",
-		"filename": "7.1.0.tar.gz",
-		"workdir": "neofetch-7.1.0",
-		"sha256": "58a95e6b714e41efc804eca389a223309169b2def35e57fa934482a6b47c27e7"
-	}`)
+	Data := []byte(query.SearchPkgs(flag.Args()[1]))
 
 	err := json.Unmarshal(Data, &target)
 
@@ -83,15 +78,13 @@ func prep() Package {
 		fmt.Println(err)
 	}
 
-	fmt.Println("", target)
-
 	return target
 }
 
 func Install() {
 	pkgInfo := prep()
 
-	fmt.Println("Installing ", pkgInfo.Name, "...")
+	fmt.Println("Installing", pkgInfo.Name, "...")
 
 	err := os.Chdir("/tmp")
 	if err != nil {
@@ -108,9 +101,9 @@ func Install() {
 
 	hash := helpers.Sha256(file)
 
-	if hash != pkgInfo.Sha256 {
+	if hash != pkgInfo.Checksum {
 
-		color.Red("Hash is mismatch (expected %s, got %s)", pkgInfo.Sha256, hash)
+		color.Red("Hash is mismatch (expected %s, got %s)", pkgInfo.Checksum, hash)
 		os.Exit(1)
 	}
 
@@ -129,11 +122,29 @@ func Install() {
 		log.Fatal(err)
 	}
 
+	color.Green("Executing install script")
+
 	cmd := exec.Command("sh", "-c", pkgInfo.Installscript)
-	err = cmd.Run()
+	stdout, err := cmd.StdoutPipe()
+	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println(pkgInfo.Name, "installed successfully!")
+	scanner := bufio.NewScanner(stdout)
+
+	if globals.Quiet == false {
+		for scanner.Scan() {
+			msg := scanner.Text()
+			fmt.Println(msg)
+		}
+	}
+	cmd.Wait()
+
+	color.Green(pkgInfo.Name + " installed successfully! Cleaning up")
+
+	err = os.RemoveAll(filepath.Join(os.TempDir(), pkgInfo.Workdir))
+	if err != nil {
+		log.Fatal(err)
+	}
 }
