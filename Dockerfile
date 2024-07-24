@@ -2,7 +2,7 @@ FROM golang:1.23rc2-alpine3.19
 
 RUN mkdir -p /build
 
-RUN apk add bash
+RUN apk add --update bash alpine-sdk
 
 COPY . /build
 
