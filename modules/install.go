@@ -26,6 +26,8 @@ type Package struct {
 	Workdir       string
 	Installscript string
 	Checksum      string
+	Description   string
+	Dependencies  []string
 }
 
 func DownloadFile(filepath string, url string) error {
@@ -59,30 +61,64 @@ func download(url string, name string) error {
 }
 
 // Install the target package
-func prep() Package {
-
-	if len(flag.Args()) < 2 {
-		fmt.Println("Usage: install <package>")
-		os.Exit(0)
-	}
-
-	fmt.Println("Looking for:", flag.Args()[1])
+func prep(pkgName string) Package {
 
 	var target Package
 
-	Data := []byte(query.SearchPkgs(flag.Args()[1]))
+	if pkgName == "" {
+		if len(flag.Args()) < 2 {
+			fmt.Println("Usage: install <package>")
+			os.Exit(0)
+		}
 
+		fmt.Println("Looking for:", flag.Args()[1])
+		Data := []byte(query.SearchPkgs(flag.Args()[1]))
+		err := json.Unmarshal(Data, &target)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	Data := []byte(query.SearchPkgs(pkgName))
 	err := json.Unmarshal(Data, &target)
-
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 
 	return target
 }
 
-func Install() {
-	pkgInfo := prep()
+func Install(pkgName string) {
+
+	var pkgInfo Package
+
+	pkgInfo = prep("")
+
+	deps := CalculateDeps(pkgInfo.Name)
+
+	if len(deps) > 0 {
+		for _, dep := range deps {
+			pkgInfo = prep(dep)
+			Install_Pkg(pkgInfo)
+			fmt.Println("Installing dependency:", dep)
+		}
+	}
+
+	// If pkgName is empty, then do interactive installation
+	if pkgName == "" {
+		color.Cyan("About to install package %s", pkgInfo.Filename)
+
+		if globals.YN == false {
+			helpers.YesNo()
+		}
+
+		Install_Pkg(pkgInfo)
+	}
+
+	// Resolve dep before installing the real package
+}
+
+func Install_Pkg(pkgInfo Package) {
 
 	fmt.Println("Installing", pkgInfo.Name, "...")
 
@@ -120,6 +156,7 @@ func Install() {
 	if err != nil {
 		color.Red("Something went wrong. Contact the package author.")
 		log.Fatal(err)
+		os.Exit(1)
 	}
 
 	color.Green("Executing install script")
@@ -129,6 +166,7 @@ func Install() {
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err)
+		os.Exit(1)
 	}
 
 	scanner := bufio.NewScanner(stdout)
@@ -144,7 +182,10 @@ func Install() {
 	color.Green(pkgInfo.Name + " installed successfully! Cleaning up")
 
 	err = os.RemoveAll(filepath.Join(os.TempDir(), pkgInfo.Workdir))
+	err = os.RemoveAll(filepath.Join(os.TempDir(), pkgInfo.Filename))
 	if err != nil {
 		log.Fatal(err)
+		os.Exit(1)
 	}
+
 }

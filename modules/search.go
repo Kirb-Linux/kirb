@@ -26,7 +26,9 @@ func parse() {
 
 	color.Set(color.FgCyan)
 	fmt.Printf("Package Name: %s\n", target.Name)
+	fmt.Printf("Description: %s\n", target.Description)
 	fmt.Printf("Checksum: %s\n", target.Checksum)
+	fmt.Printf("Dependencies: %s\n", target.Dependencies)
 	color.Unset()
 }
 
